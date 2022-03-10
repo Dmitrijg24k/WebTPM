@@ -46,6 +46,12 @@ INSTALLED_APPS = [
 ASGI_APPLICATION = 'WebTPMG.asgi.application'
 
 
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

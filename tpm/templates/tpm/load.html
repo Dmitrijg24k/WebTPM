@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <script src="https://unpkg.com/mathjs@10.1.1/lib/browser/math.js"></script>
+    <title>Document</title>
+</head>
+<body>
+    <h1>Lets chat</h1>
+
+    <form id="form">
+        <input type="text" name="message">
+    </form>
+
+    <div id="messages"></div>
+
+    <script type="text/javascript">
+        let url = `ws://${window.location.host}/ws/socket-server/`
+
+        class TPM {
+            constructor(k_, n_, l_) {
+                this.k = k_;
+                this.n = n_;
+                this.l = l_;
+                this.weights = this.initialize_w();
+                //console.log('this.weights===', this.weights);
+                this.inputs = undefined;
+                this.H = math.zeros(this.k);
+                this.out = undefined;;
+                this.X = undefined;
+            }
+            get_output(input_) {
+                //console.log('this.weights===', this.weights);
+                this.X = input_
+                this.out = 1
+                for (let i = 0; i < this.k; i++) {
+                this.H[i] = this.signum(math.multiply(input_[i], this.weights[i]))
+                this.out = this.out * this.signum(math.multiply(input_[i], this.weights[i])) 
+                }
+            }
+            initialize_w() {
+                let dim = [this.k,this.n]
+                //let p = nj.generateRandomNumbers(dim, -this.l, this.l);
+                let p = math.randomInt(dim, -this.l, this.l);
+                //console.log('this.weights===', p);
+                return p;
+                // return [[-8, -1, 8], [-1, -8, 9]]
+            }
+            signum(x) {
+                //console.log('this.weights===', this.weights);
+                return Math.sign(1) === Math.sign(x) ? 1 : -1;
+            }
+            update_weights(outputB) {
+                //console.log('this.weights===', this.weights);
+                for (let i = 0; i < this.k; i++) {
+                for (let j = 0; j < this.n; j++) {
+                    this.weights[i][j] += this.X[i][j] * this.out * this.isequal(this.out, this.H[i]) * this.isequal(this.out, outputB);
+                    this.weights[i][j] = this.g(this.weights[i][j]);
+                }
+                }
+                //console.log('this.weights===', this.weights);
+            }
+            isequal(A, B) {
+                if (A == B) {
+                return 1.0;
+                } else {
+                return 0.0;
+                }
+            }
+            g(w) {
+                if (w > this.l) {
+                return this.l;
+                }
+                if (w < -this.l) {
+                return -this.l;
+                } else {
+                return w;
+                }
+            }
+            chaosmap() {
+                // console.log('888888-', this.weights)
+                //let testweights = this.weights
+                let r = math.sum(this.weights)
+                //console.log('r-', r)
+                let rr = math.sum(math.abs(this.weights))
+                //console.log('rr-', rr)
+                let t = Math.abs(r) / rr;
+                //console.log('t-', t)
+                let x = t;
+                for (let i = 0; i < rr; i++) {
+                    x = (3.6 + t/2)* x *(1 - x)
+                }
+                //console.log('x-', x)
+                return x
+            }
+        }
+
+        class TPMClient{
+            constructor(){
+                this.user = undefined;
+                this.tpm = new TPM(16, 16, 100);
+                this.n = 0;
+                this.IsSync = false;
+            }
+            send_vector_and_output(){
+                //vector = this.rand_vec()
+                let list_vec = this.rand_vec();
+                this.tpm.get_output(list_vec);
+                
+                tpmSocket.send(JSON.stringify({
+                    'type': 'weights',
+                    'message':'sending random vector and output',
+                    'list_vec': list_vec,
+                    'output': this.tpm.out
+                }));
+                // socket.emit('weights', {
+                //     'msg':'sending random vector and output',
+                //     'vector': vector,
+                //     'output': this.tpm.out,
+                //     'sid': tpmclient.partner_sid
+                // });
+
+                this.n++;
+            }
+
+            receive_vector(vector_){ //???
+                vec = []
+                vector_.forEach(mass => {
+                    mass.forEach(element => {
+                        vec.push(element);
+                    });
+                });
+            }
+
+            rand_vec(){
+                let l = []
+                for (let i = 0; i < 16; i++) {
+                    l[i] = [];
+                    for (let j = 0; j < 16; j++){
+                        l[i][j] = math.random(-100, 100)
+                    }
+                }
+                return l
+            }
+
+            send_output(){
+                tpmSocket.send(JSON.stringify({
+                    'type': 'weights',
+                    'msg':'sending output',
+                    'output': this.tpm.out,
+                }));
+                // socket.emit('weights', {
+                //     'msg':'sending output',
+                //     'output': this.tpm.out,
+                //     'sid': tpmclient.partner_sid
+                // });
+            }
+
+            send_chaos_output(){
+                console.log('---', this.tpm.chaosmap())
+                tpmSocket.send(JSON.stringify({
+                    'type': 'receive_chaos_output',
+                    'message':'sending chaos output',
+                    'output': this.tpm.chaosmap(),
+                }));
+                // socket.emit('send_chaos_output', {
+                //     'msg':'sending chaos output',
+                //     'output': this.tpm.chaosmap(),
+                //     'sid': tpmclient.partner_sid
+                // }); 
+            }
+
+            save_key(){
+                re = []
+                this.tpm.weights.forEach(sublist => {
+                    this.tpm.weights.forEach(item => {
+                        re.push(math.abs(item+155))
+                    });
+                });
+                console.log(re)
+                //key = bytes(math.abs(x) for x in re).decode('cp437')
+            }
+        }        
+
+
+
+        const tpmSocket = new WebSocket(url)
+        let tpmclient = new TPMClient()
+
+        tpmSocket.onopen = (()=>{
+            CHANNEL = 'test';
+            console.log("Connected to server")
+            tpmSocket.send(JSON.stringify({
+                'type': 'my_message',
+                'message': 'client connected',
+            }));
+            // tpmSocket.send(JSON.stringify({
+            //     'type': 'join',
+            //     'channel': CHANNEL,
+            // }))
+        })
+
+        tpmSocket.onmessage = function(e){
+            let data = JSON.parse(e.data)
+            //console.log('Data:', data)
+            if(data.type === 'chat'){
+                let messages = document.getElementById('messages')
+
+                messages.insertAdjacentHTML('beforeend', `<div>
+                                            <p>${data.message}</p>
+                                        </div>`)
+
+            }
+            if(data.type === 'receive_chaos_output2'){
+                if (data.output == tpmclient.tpm.chaosmap()){
+                    tpmclient.IsSync = True
+                    console.log('SUCCESS: synched with Bob')
+                    tpmSocket.CLOSED()
+                    tpmclient.save_key()
+                }
+            }
+            if(data.type === 'ServerReadySync'){
+                //console.log(`ServerReadySync msg:${data.message}`)
+                tpmSocket.send(JSON.stringify({
+                    'type': 'GetParametrs',
+                    'message':'Give paremetrs of machine to server',
+                    'k': tpmclient.tpm.k,
+                    'n': tpmclient.tpm.n,
+                    'l': tpmclient.tpm.l
+                }));
+            }
+            if(data.type === 'start'){
+                //console.log(`start msg:${data.message}`)
+                tpmclient.send_vector_and_output()
+                // tpmSocket.send(JSON.stringify({
+                //     'type': 'GetParametrs',
+                //     'message':'Give paremetrs of machine to server',
+                //     'k': tpmclient.tpm.k,
+                //     'n': tpmclient.tpm.n,
+                //     'l': tpmclient.tpm.l
+                // }));
+            }
+            if(data.type === 'output_received'){
+                //console.log(`output_received msg:${data.message}`)
+                if(tpmclient.tpm.out == data['output']){
+                    tpmclient.tpm.update_weights(data['output'])
+                }
+                
+                if(tpmclient.n >= 200){
+                    if (tpmclient.n % 10 == 0){
+                        console.log(tpmclient.n)
+                        tpmclient.send_chaos_output();
+                    }
+                }
+                
+                if(!tpmclient.IsSync){
+                    tpmclient.send_vector_and_output()
+                }
+            }
+            if(data.type === 'receive_chaos_output2'){
+                console.log('++++', data.output, tpmclient.tpm.chaosmap())
+                if (data.output == tpmclient.tpm.chaosmap()){
+                    tpmclient.IsSync = True;
+                    cosole.log('SUCCESS: synched with Bob');
+                    tpmSocket.disconnect();
+                }
+            }
+            // if(data.type === 'receive_chaos_output'){
+            //     console.log(`receive_chaos_output msg:${data.message}`)
+            //     tpmSocket.send(JSON.stringify({
+            //         'type': 'confirm_chaos_output',
+            //         'message':'sending chaos output',
+            //         'output': tpmclient.tpm.chaosmap(),
+            //     }));
+            //     if (data.output == tpmclient.tpm.chaosmap()){
+            //         tpmclient.IsSync = True;
+            //         cosole.log('SUCCESS: synched with Alice');
+            //         tpmSocket.disconnect();
+            //     }
+            // }
+            // if(data.type === 'chat'){}
+        }
+
+        let form = document.getElementById('form')
+        form.addEventListener('submit', (e) => {
+            e.preventDefault()
+            let message = e.target.message.value
+            tpmSocket.send(JSON.stringify({
+                'message': message
+            }))
+            form.reset()
+        })
+
+        
+
+        let tpm = new TPM(2,3,10);
+        console.log(222)
+        console.log(tpm)
+
+
+    </script>
+</body>
+</html>

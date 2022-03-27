@@ -20,57 +20,53 @@
     <script type="text/javascript">
         let url = `ws://${window.location.host}/ws/socket-server/`
 
-        class TPM {
-            constructor(k_, n_, l_) {
+        let config = ''
+
+        class Machine {
+            constructor(k_=3, n_=4, l_=6) {
                 this.k = k_;
                 this.n = n_;
                 this.l = l_;
-                this.weights = this.initialize_w();
-                //console.log('this.weights===', this.weights);
-                this.inputs = undefined;
-                this.H = math.zeros(this.k);
-                this.out = undefined;;
-                this.X = undefined;
-            }
-            get_output(input_) {
-                //console.log('this.weights===', this.weights);
-                this.X = input_
-                this.out = 1
-                for (let i = 0; i < this.k; i++) {
-                this.H[i] = this.signum(math.multiply(input_[i], this.weights[i]))
-                this.out = this.out * this.signum(math.multiply(input_[i], this.weights[i])) 
-                }
-            }
-            initialize_w() {
                 let dim = [this.k,this.n]
-                //let p = nj.generateRandomNumbers(dim, -this.l, this.l);
-                let p = math.randomInt(dim, -this.l, this.l);
-                //console.log('this.weights===', p);
-                return p;
-                // return [[-8, -1, 8], [-1, -8, 9]]
+                this.W = math.randomInt(dim, -this.l, this.l)
             }
-            signum(x) {
-                //console.log('this.weights===', this.weights);
-                return Math.sign(1) === Math.sign(x) ? 1 : -1;
-            }
-            update_weights(outputB) {
-                //console.log('this.weights===', this.weights);
-                for (let i = 0; i < this.k; i++) {
-                for (let j = 0; j < this.n; j++) {
-                    this.weights[i][j] += this.X[i][j] * this.out * this.isequal(this.out, this.H[i]) * this.isequal(this.out, outputB);
-                    this.weights[i][j] = this.g(this.weights[i][j]);
+            get_output(X) {
+                // Returns a binary digit tau for a given random vecor.
+                // Arguments:
+                // X - Input random vector
+                let mult = [];
+                let sigma = [];
+                let tau = 1;
+                for(let i = 0; i < this.k; i++){
+                    mult[i] = [];
+                    for(let j = 0; j < this.n; j++){
+                        mult[i][j] = X[i][j] * this.W[i][j];
+                    }
+                    sigma[i] =  this.g(math.sum(mult[i]));
+                    tau *= sigma[i];
                 }
-                }
-                //console.log('this.weights===', this.weights);
+                this.X = X;
+                this.sigma = sigma;
+                this.tau = tau;
+                // for (let i = 0; i < this.k; i++) {
+                //     this.H[i] = this.signum(math.multiply(input_[i], this.weights[i]))
+                //     this.out = this.out * this.signum(math.multiply(input_[i], this.weights[i])) 
+                // }
+                return tau
             }
-            isequal(A, B) {
-                if (A == B) {
-                return 1.0;
+            g(a) {
+                if (a < 0) {
+                    return -1.0;
                 } else {
-                return 0.0;
+                    if (a>0){
+                        return 1.0;
+                    }
+                    else{
+                        return 0.0
+                    }
                 }
             }
-            g(w) {
+            Interval(w) {
                 if (w > this.l) {
                 return this.l;
                 }
@@ -80,121 +76,101 @@
                 return w;
                 }
             }
+            update(tau2, X, update_rule='hebbian'){
+                // Updates the weights according to the specified update rule.
+
+                // Arguments:
+                // tau2 - Output bit from the other machine;
+
+                // update_rule - The update rule. 
+                // Should be one of ['hebbian', 'anti_hebbian', random_walk']
+                if (this.tau == tau2){
+                    if(update_rule == 'hebbian'){
+                        // console.log(this.W)
+                        for(let i = 0; i < this.W.length; i++){
+                            for(let j = 0; j < this.W[i].length; j++){
+                                this.W[i][j] += X[i][j] * this.tau * this.theta(this.sigma[i], this.tau) * this.theta(this.tau, tau2);
+                                this.W[i][j] = this.Interval(this.W[i][j]);
+                            }
+                        }
+                        // console.log(this.W)
+                    } else{
+                        if(update_rule == 'anti_hebbian'){
+                            this.anti_hebbian(this.W, this.X, this.sigma, this.tau, tau2)
+                        } else{
+                            if(update_rule == 'random_walk'){
+                                this.random_walk(this.W, this.X, this.sigma, this.tau, tau2)
+                            }
+                        }
+                    }
+                }
+            }
+            theta(t1, t2){
+                return (parseInt(t1) == parseInt(t2)) ? 1 : 0;
+            }
+            hebbian(W, X, sigma, tau1, tau2){
+                for(let i = 0; i < W.lenght; i++){
+                    for(let j = 0; j < W[i].lenght; j++){
+                        this.W[i][j] += X[i][j] * tau1 * this.theta(sigma[i], tau1) * this.theta(tau1, tau2);
+                        this.W[i][j] = this.Interval(this.W[i][j]);
+                    }
+                }
+            }
+            anti_hebbian(W, X, sigma, tau1, tau2){
+                for(let i = 0; i < W.lenght; i++){
+                    for(let j = 0; j < W[i].lenght; j++){
+                        this.W[i][j] -= X[i][j] * tau1 * this.theta(sigma[i], tau1) * this.theta(tau1, tau2);
+                        this.W[i][j] = this.Interval(this.W[i][j]);
+                    }
+                }
+            }
+            random_walk(W, X, sigma, tau1, tau2){
+                for(let i = 0; i < W.lenght; i++){
+                    for(let j = 0; j < W[i].lenght; j++){
+                        this.W[i][j] += X[i][j] * this.theta(sigma[i], tau1) * this.theta(tau1, tau2);
+                        this.W[i][j] = this.Interval(this.W[i][j]);
+                    }
+                }
+            }
             chaosmap() {
-                // console.log('888888-', this.weights)
-                //let testweights = this.weights
-                let r = math.sum(this.weights)
-                //console.log('r-', r)
-                let rr = math.sum(math.abs(this.weights))
-                //console.log('rr-', rr)
-                let t = Math.abs(r) / rr;
-                //console.log('t-', t)
+                let r = math.sum(this.W)
+                let rr = math.sum(math.abs(this.W))
+                let t = math.abs(r) / rr;
                 let x = t;
                 for (let i = 0; i < rr; i++) {
-                    x = (3.6 + t/2)* x *(1 - x)
+                x = (3.6 + t/2)* x *(1 - x)
                 }
-                //console.log('x-', x)
                 return x
             }
         }
 
-        class TPMClient{
-            constructor(){
-                this.user = undefined;
-                this.tpm = new TPM(16, 16, 100);
-                this.n = 0;
-                this.IsSync = false;
+        function gen_rand_vector(sid, l, k, n){
+            config = {
+                epsilon: 1e-12,
+                matrix: 'Matrix',
+                number: 'number',
+                precision: 64,
+                predictable: false,
+                randomSeed: sid
             }
-            send_vector_and_output(){
-                //vector = this.rand_vec()
-                let list_vec = this.rand_vec();
-                this.tpm.get_output(list_vec);
-                
-                tpmSocket.send(JSON.stringify({
-                    'type': 'weights',
-                    'message':'sending random vector and output',
-                    'list_vec': list_vec,
-                    'output': this.tpm.out
-                }));
-                // socket.emit('weights', {
-                //     'msg':'sending random vector and output',
-                //     'vector': vector,
-                //     'output': this.tpm.out,
-                //     'sid': tpmclient.partner_sid
-                // });
+            math = math.create(math.all, config)
+            dim = [k,n]
+            console.log(sid, math.randomInt(dim, -l, l) )
+            return math.randomInt(dim, -l, l) 
+        } //сид, диапазон, количество нейронов, количество входов
 
-                this.n++;
-            }
-
-            receive_vector(vector_){ //???
-                vec = []
-                vector_.forEach(mass => {
-                    mass.forEach(element => {
-                        vec.push(element);
-                    });
-                });
-            }
-
-            rand_vec(){
-                let l = []
-                for (let i = 0; i < 16; i++) {
-                    l[i] = [];
-                    for (let j = 0; j < 16; j++){
-                        l[i][j] = math.random(-100, 100)
-                    }
-                }
-                return l
-            }
-
-            send_output(){
-                tpmSocket.send(JSON.stringify({
-                    'type': 'weights',
-                    'msg':'sending output',
-                    'output': this.tpm.out,
-                }));
-                // socket.emit('weights', {
-                //     'msg':'sending output',
-                //     'output': this.tpm.out,
-                //     'sid': tpmclient.partner_sid
-                // });
-            }
-
-            send_chaos_output(){
-                console.log('---', this.tpm.chaosmap())
-                tpmSocket.send(JSON.stringify({
-                    'type': 'receive_chaos_output',
-                    'message':'sending chaos output',
-                    'output': this.tpm.chaosmap(),
-                }));
-                // socket.emit('send_chaos_output', {
-                //     'msg':'sending chaos output',
-                //     'output': this.tpm.chaosmap(),
-                //     'sid': tpmclient.partner_sid
-                // }); 
-            }
-
-            save_key(){
-                re = []
-                this.tpm.weights.forEach(sublist => {
-                    this.tpm.weights.forEach(item => {
-                        re.push(math.abs(item+155))
-                    });
-                });
-                console.log(re)
-                //key = bytes(math.abs(x) for x in re).decode('cp437')
-            }
-        }        
-
-
+        let k = 3
+        let n = 3
+        let l = 4
 
         const tpmSocket = new WebSocket(url)
-        let tpmclient = new TPMClient()
+        let ClientTPM = new Machine()
 
         tpmSocket.onopen = (()=>{
             CHANNEL = 'test';
             console.log("Connected to server")
             tpmSocket.send(JSON.stringify({
-                'type': 'my_message',
+                'type': 'ClientReadySync',
                 'message': 'client connected',
             }));
             // tpmSocket.send(JSON.stringify({
@@ -224,49 +200,59 @@
             }
             if(data.type === 'ServerReadySync'){
                 //console.log(`ServerReadySync msg:${data.message}`)
+                ClientTPM = new Machine(k, n, l)
                 tpmSocket.send(JSON.stringify({
                     'type': 'GetParametrs',
                     'message':'Give paremetrs of machine to server',
-                    'k': tpmclient.tpm.k,
-                    'n': tpmclient.tpm.n,
-                    'l': tpmclient.tpm.l
+                    'k': ClientTPM.k,
+                    'n': ClientTPM.n,
+                    'l': ClientTPM.l
                 }));
             }
-            if(data.type === 'start'){
-                //console.log(`start msg:${data.message}`)
-                tpmclient.send_vector_and_output()
-                // tpmSocket.send(JSON.stringify({
-                //     'type': 'GetParametrs',
-                //     'message':'Give paremetrs of machine to server',
-                //     'k': tpmclient.tpm.k,
-                //     'n': tpmclient.tpm.n,
-                //     'l': tpmclient.tpm.l
-                // }));
+            if(data.type === 'GetFirstSid'){
+                //console.log(`ServerReadySync msg:${data.message}`)
+                console.log("sid:",data['sid'])
+                let X = data['vector']//gen_rand_vector(data['sid'], ClientTPM.l, ClientTPM.k, ClientTPM.n)
+                console.log("Vector:",X)
+                let resultClient = ClientTPM.get_output(X)
+                console.log("resultClient:",resultClient)
+                console.log("=================");
+                tpmSocket.send(JSON.stringify({
+                    'type': 'GetResultClient',
+                    'resultClient':resultClient,
+                    'chaosmap': ClientTPM.chaosmap(),
+                    'W': ClientTPM.W
+                }));
             }
-            if(data.type === 'output_received'){
+            if(data.type === 'GetSidAndResultTrue'){
+                //console.log(ClientTPM)
+                let X = data['vector']//(data["sid"], l, k, n);
+                console.log(data['sid'])
+                console.log(X)
+                ClientTPM.update(data["Result"],X, 'hebbian');
+                let resultClient =  ClientTPM.get_output(X);
+                tpmSocket.send(JSON.stringify({
+                    'type': 'GetResultClient',
+                    'resultClient':resultClient,
+                    'chaosmap': ClientTPM.chaosmap(),
+                    'W': ClientTPM.W
+                }));
+            }
+            if(data.type === 'GetSidAndResultFalse'){
                 //console.log(`output_received msg:${data.message}`)
-                if(tpmclient.tpm.out == data['output']){
-                    tpmclient.tpm.update_weights(data['output'])
-                }
-                
-                if(tpmclient.n >= 200){
-                    if (tpmclient.n % 10 == 0){
-                        console.log(tpmclient.n)
-                        tpmclient.send_chaos_output();
-                    }
-                }
-                
-                if(!tpmclient.IsSync){
-                    tpmclient.send_vector_and_output()
-                }
+                let X = data['vector']//gen_rand_vector(data["sid"], l, k, n);
+                let resultClient =  ClientTPM.get_output(X);
+                tpmSocket.send(JSON.stringify({
+                    'type': 'GetResultClient',
+                    'resultClient':resultClient,
+                    'chaosmap': ClientTPM.chaosmap(),
+                    'W': ClientTPM.W
+                }));
             }
-            if(data.type === 'receive_chaos_output2'){
-                console.log('++++', data.output, tpmclient.tpm.chaosmap())
-                if (data.output == tpmclient.tpm.chaosmap()){
-                    tpmclient.IsSync = True;
-                    cosole.log('SUCCESS: synched with Bob');
-                    tpmSocket.disconnect();
-                }
+            if(data.type === 'FinishSync'){
+                console.log('FinishSync')
+                console.log(ClientTPM.chaosmap())
+                tpmSocket.disconnect();
             }
             // if(data.type === 'receive_chaos_output'){
             //     console.log(`receive_chaos_output msg:${data.message}`)
@@ -296,9 +282,9 @@
 
         
 
-        let tpm = new TPM(2,3,10);
-        console.log(222)
-        console.log(tpm)
+        // let tpm = new TPM(2,3,10);
+        // console.log(222)
+        // console.log(tpm)
 
 
     </script>

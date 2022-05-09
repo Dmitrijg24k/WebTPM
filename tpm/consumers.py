@@ -6,6 +6,8 @@ import numpy as np
 import math
 import random
 from random import randrange
+import time
+
 
 class Machine:
     def __init__(self, k=3, n=4, l=6):
@@ -79,17 +81,12 @@ class Machine:
             W[i, j] = np.clip(W[i, j] , -l, l)
         self.W = W
     def chaosmap(self):
-        print(self.W)
         r = sum(list(np.hstack(self.W)))
-        print("r-", r)
         rr = sum([abs(x) for x in (list(np.hstack(self.W)))])
-        print("rr-", rr)
         t = float(abs(r)) / float(rr)
-        print("t-", t)
         x = t
         for i in range(rr):
             x = (3.6 + t/2)* x *(1 - x)
-        print("x-", x)
         return x
 
 def gen_rand_vector(sid, l, k, n): #сид, диапазон, количество нейронов, количество входов
@@ -119,8 +116,9 @@ class TpmConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         # message = text_data_json['message']
         #print("connect0", message)
+        # time.sleep(0.4)
         if text_data_json['type'] == 'ClientReadySync':
-            print(text_data_json)
+            # print(text_data_json)
             # message = text_data_json['message']
             # self.ServerTPM = TPMClient(text_data_json['k'],text_data_json['n'], text_data_json['l'])
             self.send(text_data=json.dumps({
@@ -128,7 +126,7 @@ class TpmConsumer(WebsocketConsumer):
                 'message': 'Server is ready'
             }))
         if text_data_json['type'] == 'GetParametrs':
-            print(text_data_json)
+            # print(text_data_json)
             # message = text_data_json['message']
             self.timer = 0
             self.k = text_data_json['k']
@@ -158,16 +156,18 @@ class TpmConsumer(WebsocketConsumer):
             #print("resultClient:{}".format(text_data_json['resultClient']))
             #self.ServerTPM.update(self.resultClient, 'hebbian')
             # message = text_data_json['message']
+            # print('server-', self.ServerTPM.W)
+            print('chaosmap-', self.ServerTPM.chaosmap())
             self.sid = gen_sid()
             if self.resultServer == text_data_json['resultClient']:
-                #print(self.sid)
-                ClientW = np.array(text_data_json['W'])
-                ttt = True
-                for i in range(len(self.ServerTPM.W)):
-                    for j in range(len(self.ServerTPM.W[i])):
-                        if self.ServerTPM.W[i][j] != ClientW[i][j]:
-                            ttt = False
-                if ttt:
+                print(self.ServerTPM.chaosmap())
+                # ClientW = np.array(text_data_json['W'])
+                # ttt = True
+                # for i in range(len(self.ServerTPM.W)):
+                #     for j in range(len(self.ServerTPM.W[i])):
+                #         if self.ServerTPM.W[i][j] != ClientW[i][j]:
+                #             ttt = False
+                if self.ServerTPM.chaosmap()==text_data_json['chaosmap']:
                     print(self.ServerTPM.chaosmap()==text_data_json['chaosmap'])
                     print('server-', self.ServerTPM.W)
                     print('client-',np.array(text_data_json['W']))
@@ -177,12 +177,12 @@ class TpmConsumer(WebsocketConsumer):
                         'message': 'FinishSync hehe',
                     }))
                 else:
-                    print(self.sid)
-                    print(self.ServerTPM.X)
-                    print('server-', self.ServerTPM.W)
-                    print('client-',np.array(text_data_json['W']))
-                    print('result1-',self.ServerTPM.tau)
-                    print('result2-',int(text_data_json['resultClient']))
+                    # print(self.sid)
+                    # print(self.ServerTPM.X)
+                    # print('server-', self.ServerTPM.W)
+                    # print('client-',np.array(text_data_json['W']))
+                    # print('result1-',self.ServerTPM.tau)
+                    # print('result2-',int(text_data_json['resultClient']))
                     self.ServerTPM.update(int(text_data_json['resultClient']), 'hebbian')
                     #print(self.sid)
                     #print(self.ServerTPM.W)
@@ -196,6 +196,7 @@ class TpmConsumer(WebsocketConsumer):
                         'sid': int(self.sid),
                         'vector': self.ServerTPM.X.tolist(),
                         "Result": int(self.resultServer),
+                        "W": self.ServerTPM.W.tolist(),
                     }))
             else:
                 # vector = []

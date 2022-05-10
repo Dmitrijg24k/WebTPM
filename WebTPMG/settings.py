@@ -27,6 +27,11 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+AUTH_USER_MODEL = 'tpm.User'
+
+LOGIN_REDIRECT_URL = '/load/'
+
+LOGOUT_REDIRECT_URL = '/'
 
 # Application definition
 

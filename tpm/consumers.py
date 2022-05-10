@@ -7,7 +7,7 @@ import math
 import random
 from random import randrange
 import time
-
+from .models import Sessions
 
 class Machine:
     def __init__(self, k=3, n=4, l=6):
@@ -100,6 +100,7 @@ class TpmConsumer(WebsocketConsumer):
     # let ServerTPM = 
     def connect(self):
         self.accept()
+        print(dir(self),self.channel_name, self.chat_message, self.groups, self.scope)
         # self.send(text_data=json.dumps({
         #     'type': 'ServerReadySync',
         #     'message': 'Client connected'
@@ -172,6 +173,15 @@ class TpmConsumer(WebsocketConsumer):
                     print('server-', self.ServerTPM.W)
                     print('client-',np.array(text_data_json['W']))
                     print("FinishSync:{}".format(self.ServerTPM.W))
+                    result = ''
+                    for i in range(len(self.ServerTPM.W)):
+                        for j in range(len(self.ServerTPM.W[i])):
+                            result += str(self.ServerTPM.W[i][j])
+                    session = Sessions(
+                        numberSession = np.random.randint(1000),
+                        sessionKey = result
+                    )
+                    session.save()
                     self.send(text_data=json.dumps({
                         'type': 'FinishSync',
                         'message': 'FinishSync hehe',

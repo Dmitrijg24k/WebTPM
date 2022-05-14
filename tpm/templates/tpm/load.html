@@ -215,136 +215,141 @@
             return math.randomInt(dim, -l, l) 
         } //сид, диапазон, количество нейронов, количество входов
 
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
         let k = 8
-        let n = 16
-        let l = 300
+        let n = 8
+        let l = 100
 
-        const tpmSocket = new WebSocket(url)
-        let ClientTPM = new Machine()
+        function start(websocketServerLocation){
+            tpmSocket = new WebSocket(websocketServerLocation);
 
-        tpmSocket.onopen = (()=>{
-            CHANNEL = 'test';
-            console.log("Connected to server")
-            tpmSocket.send(JSON.stringify({
-                'type': 'ClientReadySync',
-                'message': 'client connected',
-            }));
-            // tpmSocket.send(JSON.stringify({
-            //     'type': 'join',
-            //     'channel': CHANNEL,
-            // }))
-        })
+            let ClientTPM = new Machine()
 
-        tpmSocket.onmessage = function(e){
-            let data = JSON.parse(e.data)
-            //console.log('Data:', data)
-            if(data.type === 'chat'){
-                let messages = document.getElementById('messages')
+            tpmSocket.onopen = (()=>{
+                console.log("Connected to server")
+                //ClientTPM = new Machine()
+                tpmSocket.send(JSON.stringify({
+                    'type': 'ClientReadySync',
+                    'message': 'client connected',
+                }));
+                    // tpmSocket.send(JSON.stringify({
+                    //     'type': 'join',
+                    //     'channel': CHANNEL,
+                    // }))
+            })
 
-                messages.insertAdjacentHTML('beforeend', `<div>
-                                            <p>${data.message}</p>
-                                        </div>`)
+            tpmSocket.onmessage = function(e){
+                let data = JSON.parse(e.data)
+                //console.log('Data:', data)
+                if(data.type === 'chat'){
+                    let messages = document.getElementById('messages')
 
-            }
-            if(data.type === 'receive_chaos_output2'){
-                if (data.output == tpmclient.tpm.chaosmap()){
-                    tpmclient.IsSync = True
-                    console.log('SUCCESS: synched with Bob')
-                    tpmSocket.CLOSED()
-                    tpmclient.save_key()
+                    messages.insertAdjacentHTML('beforeend', `<div>
+                                                <p>${data.message}</p>
+                                            </div>`)
+
                 }
+                if(data.type === 'receive_chaos_output2'){
+                    if (data.output == tpmclient.tpm.chaosmap()){
+                        tpmclient.IsSync = True
+                        console.log('SUCCESS: synched with Bob')
+                        tpmSocket.CLOSED()
+                        tpmclient.save_key()
+                    }
+                }
+                if(data.type === 'ServerReadySync'){
+                    //console.log(`ServerReadySync msg:${data.message}`)
+                    ClientTPM = new Machine(k, n, l)
+                    tpmSocket.send(JSON.stringify({
+                        'type': 'GetParametrs',
+                        'message':'Give paremetrs of machine to server',
+                        'k': ClientTPM.k,
+                        'n': ClientTPM.n,
+                        'l': ClientTPM.l
+                    }));
+                }
+                if(data.type === 'GetFirstSid'){
+                    //console.log(`ServerReadySync msg:${data.message}`)
+                    // console.log("sid:",data['sid'])
+                    let X = data['vector']//gen_rand_vector(data['sid'], ClientTPM.l, ClientTPM.k, ClientTPM.n)
+                    // console.log("Vector:",X)
+                    let resultClient = ClientTPM.get_output(X)
+                    // console.log("resultClient:",resultClient)
+                    // console.log("=================");
+                    tpmSocket.send(JSON.stringify({
+                        'type': 'GetResultClient',
+                        'resultClient':resultClient,
+                        'chaosmap': ClientTPM.chaosmap(),
+                        'W': ClientTPM.W
+                    }));
+                }
+                if(data.type === 'GetSidAndResultTrue'){
+                    //console.log(ClientTPM)
+                    let X = data['vector']//(data["sid"], l, k, n);
+                    console.log(ClientTPM.W)
+                    console.log(ClientTPM.chaosmap())
+                    // setTimeout(() => {ClientTPM.update(data["Result"],X, 'hebbian'); }, 0);
+                    ClientTPM.update(data["Result"],X, 'hebbian', data['W']);
+                    let resultClient =  ClientTPM.get_output(X);
+                        tpmSocket.send(JSON.stringify({
+                            'type': 'GetResultClient',
+                            'resultClient':resultClient,
+                            'chaosmap': ClientTPM.chaosmap(),
+                            'W': ClientTPM.W
+                    }));
+                }
+                if(data.type === 'GetSidAndResultFalse'){
+                    //console.log(`output_received msg:${data.message}`)
+                    let X = data['vector']//gen_rand_vector(data["sid"], l, k, n);
+                    let resultClient =  ClientTPM.get_output(X);
+                    tpmSocket.send(JSON.stringify({
+                        'type': 'GetResultClient',
+                        'resultClient':resultClient,
+                        'chaosmap': ClientTPM.chaosmap(),
+                        'W': ClientTPM.W
+                    }));
+                }
+                if(data.type === 'FinishSync'){
+                    console.log('FinishSync')
+                    console.log(ClientTPM.W)
+                    console.log(ClientTPM.chaosmap())
+                    tpmSocket.close();
+                }
+                // if(data.type === 'Resync'){
+                //     console.log('Reconnect');
+                //     tpmSocket.send(JSON.stringify({
+                //         'type': 'ClientReadySync',
+                //         'message': 'client connected',
+                //     }));
+                // }
+                // if(data.type === 'receive_chaos_output'){
+                //     console.log(`receive_chaos_output msg:${data.message}`)
+                //     tpmSocket.send(JSON.stringify({
+                //         'type': 'confirm_chaos_output',
+                //         'message':'sending chaos output',
+                //         'output': tpmclient.tpm.chaosmap(),
+                //     }));
+                //     if (data.output == tpmclient.tpm.chaosmap()){
+                //         tpmclient.IsSync = True;
+                //         cosole.log('SUCCESS: synched with Alice');
+                //         tpmSocket.disconnect();
+                //     }
+                // }
+                // if(data.type === 'chat'){}
             }
-            if(data.type === 'ServerReadySync'){
-                //console.log(`ServerReadySync msg:${data.message}`)
-                ClientTPM = new Machine(k, n, l)
-                tpmSocket.send(JSON.stringify({
-                    'type': 'GetParametrs',
-                    'message':'Give paremetrs of machine to server',
-                    'k': ClientTPM.k,
-                    'n': ClientTPM.n,
-                    'l': ClientTPM.l
-                }));
-            }
-            if(data.type === 'GetFirstSid'){
-                //console.log(`ServerReadySync msg:${data.message}`)
-                // console.log("sid:",data['sid'])
-                let X = data['vector']//gen_rand_vector(data['sid'], ClientTPM.l, ClientTPM.k, ClientTPM.n)
-                // console.log("Vector:",X)
-                let resultClient = ClientTPM.get_output(X)
-                // console.log("resultClient:",resultClient)
-                // console.log("=================");
-                tpmSocket.send(JSON.stringify({
-                    'type': 'GetResultClient',
-                    'resultClient':resultClient,
-                    'chaosmap': ClientTPM.chaosmap(),
-                    'W': ClientTPM.W
-                }));
-            }
-            if(data.type === 'GetSidAndResultTrue'){
-                //console.log(ClientTPM)
-                let X = data['vector']//(data["sid"], l, k, n);
-                console.log(ClientTPM.W)
-                console.log(ClientTPM.chaosmap())
-                // setTimeout(() => {ClientTPM.update(data["Result"],X, 'hebbian'); }, 0);
-                ClientTPM.update(data["Result"],X, 'hebbian', data['W']);
-                let resultClient =  ClientTPM.get_output(X);
-                tpmSocket.send(JSON.stringify({
-                    'type': 'GetResultClient',
-                    'resultClient':resultClient,
-                    'chaosmap': ClientTPM.chaosmap(),
-                    'W': ClientTPM.W
-                }));
-            }
-            if(data.type === 'GetSidAndResultFalse'){
-                //console.log(`output_received msg:${data.message}`)
-                let X = data['vector']//gen_rand_vector(data["sid"], l, k, n);
-                let resultClient =  ClientTPM.get_output(X);
-                tpmSocket.send(JSON.stringify({
-                    'type': 'GetResultClient',
-                    'resultClient':resultClient,
-                    'chaosmap': ClientTPM.chaosmap(),
-                    'W': ClientTPM.W
-                }));
-            }
-            if(data.type === 'FinishSync'){
-                console.log('FinishSync')
-                console.log(ClientTPM.W)
-                console.log(ClientTPM.chaosmap())
-                console.log(ClientTPM.chaosmap())
-                tpmSocket.close();
-            }
-            // if(data.type === 'receive_chaos_output'){
-            //     console.log(`receive_chaos_output msg:${data.message}`)
-            //     tpmSocket.send(JSON.stringify({
-            //         'type': 'confirm_chaos_output',
-            //         'message':'sending chaos output',
-            //         'output': tpmclient.tpm.chaosmap(),
-            //     }));
-            //     if (data.output == tpmclient.tpm.chaosmap()){
-            //         tpmclient.IsSync = True;
-            //         cosole.log('SUCCESS: synched with Alice');
-            //         tpmSocket.disconnect();
-            //     }
-            // }
-            // if(data.type === 'chat'){}
+
+            // ws.onmessage = function(evt) { alert('message received'); };
+            tpmSocket.onclose = function(){
+                // Try to reconnect in 5 seconds
+                setTimeout(function(){start(websocketServerLocation)}, 35000);
+            };
         }
 
-        let form = document.getElementById('form')
-        form.addEventListener('submit', (e) => {
-            e.preventDefault()
-            let message = e.target.message.value
-            tpmSocket.send(JSON.stringify({
-                'message': message
-            }))
-            form.reset()
-        })
+        start(url)
 
-        
 
-        // let tpm = new TPM(2,3,10);
-        // console.log(222)
-        // console.log(tpm)
-
+        console.log('end')
 
     </script>
 </body>

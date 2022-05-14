@@ -100,7 +100,7 @@ class TpmConsumer(WebsocketConsumer):
     # let ServerTPM = 
     def connect(self):
         self.accept()
-        print(dir(self),self.channel_name, self.chat_message, self.groups, self.scope)
+        print(dir(self.scope["user"]))
         # self.send(text_data=json.dumps({
         #     'type': 'ServerReadySync',
         #     'message': 'Client connected'
@@ -120,6 +120,9 @@ class TpmConsumer(WebsocketConsumer):
         # time.sleep(0.4)
         if text_data_json['type'] == 'ClientReadySync':
             # print(text_data_json)
+            currentSession = self.scope["user"].sessionId
+            if (currentSession):
+                currentSession.delete()
             # message = text_data_json['message']
             # self.ServerTPM = TPMClient(text_data_json['k'],text_data_json['n'], text_data_json['l'])
             self.send(text_data=json.dumps({
@@ -178,14 +181,25 @@ class TpmConsumer(WebsocketConsumer):
                         for j in range(len(self.ServerTPM.W[i])):
                             result += str(self.ServerTPM.W[i][j])
                     session = Sessions(
-                        numberSession = np.random.randint(1000),
                         sessionKey = result
                     )
+                    print(1111, session.id)
                     session.save()
+                    self.scope["user"].sessionId = session
+                    self.scope["user"].save()
                     self.send(text_data=json.dumps({
                         'type': 'FinishSync',
                         'message': 'FinishSync hehe',
                     }))
+                    # print(11111111111111111111)
+                    # time.sleep(60)
+                    # print(22222222222222222222)
+                    # currentSession = self.scope["user"].sessionId
+                    # currentSession.delete()
+                    # self.send(text_data=json.dumps({
+                    #     'type': 'Resync',
+                    #     'message': 'Resync tpms',
+                    # }))
                 else:
                     # print(self.sid)
                     # print(self.ServerTPM.X)

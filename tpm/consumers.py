@@ -150,7 +150,9 @@ def gen_rand_vector(seed, L, K, N): # сид, диапазон, количест
     result = np.empty((K,N), dtype = int)
     for i in range(K):
         for j in range(N):
-            result[i][j] = (generator.get_random_number() % L)
+            result[i][j] = (generator.get_random_number() % (2 * L))
+            if result[i][j] - L < 0:
+                result[i][j] *= -1
     # print('seed, vector', seed, np.random.randint(-l, l + 1, [k, n]))
     return result
 
@@ -222,7 +224,7 @@ class TpmConsumer(WebsocketConsumer):
             #print("Vector:{}".format(self.X))
             self.resultServer = self.ServerTPM.get_output(self.ServerTPM.X)
             self.seed = gen_seed()
-            self.ServerTPM.X = np.array(text_data_json['X'])#gen_rand_vector(self.seed, self.l, self.k, self.n)
+            self.ServerTPM.X = gen_rand_vector(self.seed, self.l, self.k, self.n)
             #print("resultServer:{}".format(self.resultServer))
             #print("resultClient:{}".format(text_data_json['resultClient']))
             #self.ServerTPM.update(self.resultClient, 'hebbian')

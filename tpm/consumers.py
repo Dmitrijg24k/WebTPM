@@ -9,6 +9,51 @@ from random import randrange
 import time
 from .models import Sessions
 
+
+class mersenne_rng(object):
+    def __init__(self, seed = 5489):
+        self.state = [0]*624
+        self.f = 1812433253
+        self.m = 397
+        self.u = 11
+        self.s = 7
+        self.b = 0x9D2C5680
+        self.t = 15
+        self.c = 0xEFC60000
+        self.l = 18
+        self.index = 624
+        self.lower_mask = (1<<31)-1
+        self.upper_mask = 1<<31
+
+        # update state
+        self.state[0] = seed
+        for i in range(1,624):
+            self.state[i] = self.int_32(self.f*(self.state[i-1]^(self.state[i-1]>>30)) + i)
+
+    def twist(self):
+        for i in range(624):
+            temp = self.int_32((self.state[i]&self.upper_mask)+(self.state[(i+1)%624]&self.lower_mask))
+            temp_shift = temp>>1
+            if temp%2 != 0:
+                temp_shift = temp_shift^0x9908b0df
+            self.state[i] = self.state[(i+self.m)%624]^temp_shift
+        self.index = 0
+
+    def get_random_number(self):
+        if self.index >= 624:
+            self.twist()
+        y = self.state[self.index]
+        y = y^(y>>self.u)
+        y = y^((y<<self.s)&self.b)
+        y = y^((y<<self.t)&self.c)
+        y = y^(y>>self.l)
+        self.index+=1
+        return self.int_32(y)
+
+    def int_32(self, number):
+        return int(0xFFFFFFFF & number)
+
+
 class Machine:
     def __init__(self, k=3, n=4, l=6):
         self.k = k
@@ -25,15 +70,19 @@ class Machine:
         k = self.k
         n = self.n
         W = self.W
+        print(1111111111, X)
         X = X.reshape([k, n])
+        print(2222222222, X)
         sigma = np.sign(np.sum(X * W, axis=1)) # Compute inner activation sigma Dimension:[K]
         tau = np.prod(sigma) # The final output
         self.X = X
         self.sigma = sigma
         self.tau = tau
         return tau
+
     def __call__(self, X):
         return self.get_output(X)
+
     def update(self, tau2, update_rule='hebbian'):
         '''
         Updates the weights according to the specified update rule.
@@ -60,26 +109,31 @@ class Machine:
             else:
                 raise Exception("Invalid update rule. Valid update rules are: " + 
                     "\'hebbian\', \'anti_hebbian\' and \'random_walk\'.")
-    def theta(self,t1, t2):
+
+    def theta(self, t1, t2):
         return 1 if t1 == t2 else 0
+
     def hebbian(self, W, X, sigma, tau1, tau2, l):
         k, n = W.shape
         for (i, j), _ in np.ndenumerate(W):
             W[i, j] += X[i, j] * tau1 * self.theta(sigma[i], tau1) * self.theta(tau1, tau2)
             W[i, j] = np.clip(W[i, j] , -l, l)
         self.W = W
+
     def anti_hebbian(self, W, X, sigma, tau1, tau2, l):
         k, n = W.shape
         for (i, j), _ in np.ndenumerate(W):
             W[i, j] -= X[i, j] * tau1 * self.theta(sigma[i], tau1) * self.theta(tau1, tau2)
             W[i, j] = np.clip(W[i, j], -l, l)
         self.W = W
+
     def random_walk(self, W, X, sigma, tau1, tau2, l):
         k, n = W.shape
         for (i, j), _ in np.ndenumerate(W):
             W[i, j] += X[i, j] * self.theta(sigma[i], tau1) * self.theta(tau1, tau2)
             W[i, j] = np.clip(W[i, j] , -l, l)
         self.W = W
+
     def chaosmap(self):
         r = sum(list(np.hstack(self.W)))
         rr = sum([abs(x) for x in (list(np.hstack(self.W)))])
@@ -89,12 +143,21 @@ class Machine:
             x = (3.6 + t/2)* x *(1 - x)
         return x
 
-def gen_rand_vector(sid, l, k, n): #сид, диапазон, количество нейронов, количество входов
-    np.random.seed(sid)
-    #print('sid, vector', sid, np.random.randint(-l, l + 1, [k, n]))
-    return np.random.randint(-l, l + 1, [k, n])
-def gen_sid():
+
+def gen_rand_vector(seed, L, K, N): # сид, диапазон, количество нейронов, количество входов
+    generator = mersenne_rng(seed)
+    
+    result = np.empty((K,N), dtype = int)
+    for i in range(K):
+        for j in range(N):
+            result[i][j] = (generator.get_random_number() % L)
+    # print('seed, vector', seed, np.random.randint(-l, l + 1, [k, n]))
+    return result
+
+
+def gen_seed():
     return random.randint(0, 1000)
+
 
 class TpmConsumer(WebsocketConsumer):
     # let ServerTPM = 
@@ -130,40 +193,45 @@ class TpmConsumer(WebsocketConsumer):
                 'message': 'Server is ready'
             }))
         if text_data_json['type'] == 'GetParametrs':
-            # print(text_data_json)
+            #print('GetParametrs')
             # message = text_data_json['message']
             self.timer = 0
             self.k = text_data_json['k']
             self.n = text_data_json['n']
             self.l = text_data_json['l']
             self.ServerTPM = Machine(text_data_json['k'],text_data_json['n'], text_data_json['l'])
-            self.sid = gen_sid()
+            #print('GetParametrs2')
+            self.seed = gen_seed()
             # vector = []
-            self.ServerTPM.X = gen_rand_vector(self.sid, self.l, self.k, self.n)
+            self.ServerTPM.X = gen_rand_vector(self.seed, self.l, self.k, self.n)#text_data_json['X']#gen_rand_vector(self.seed, self.l, self.k, self.n)
+            print(self.seed, '-XXXXXXXXX----', self.ServerTPM.X)
             # for i in range(len(X)):
             #     vector.append([])
             #     for j in range(len(X[i])):
             #         vector[i].append(X[i][j])
             self.send(text_data=json.dumps({
-                'type': 'GetFirstSid',
-                'sid': self.sid,
+                'type': 'GetFirstSeed',
+                'seed': self.seed,
                 'vector': self.ServerTPM.X.tolist()
             }))
         if text_data_json['type'] == 'GetResultClient':
+            #print('GetResultClient')
             #print(self.ServerTPM.k, self.ServerTPM.n, self.ServerTPM.l)
-            #print("sid:{}".format(self.sid))
-            # self.X = gen_rand_vector(self.sid, self.l, self.k, self.n)
+            #print("seed:{}".format(self.seed))
+            # self.X = gen_rand_vector(self.seed, self.l, self.k, self.n)
             #print("Vector:{}".format(self.X))
             self.resultServer = self.ServerTPM.get_output(self.ServerTPM.X)
-            self.ServerTPM.X = gen_rand_vector(self.sid, self.l, self.k, self.n)
+            self.seed = gen_seed()
+            self.ServerTPM.X = np.array(text_data_json['X'])#gen_rand_vector(self.seed, self.l, self.k, self.n)
             #print("resultServer:{}".format(self.resultServer))
             #print("resultClient:{}".format(text_data_json['resultClient']))
             #self.ServerTPM.update(self.resultClient, 'hebbian')
             # message = text_data_json['message']
             # print('server-', self.ServerTPM.W)
+            print(self.seed, '-XXXXXXXXX----', self.ServerTPM.X)
             print('chaosmap-', self.ServerTPM.chaosmap())
-            self.sid = gen_sid()
             if self.resultServer == text_data_json['resultClient']:
+                print('resultServer = resultClient')
                 print(self.ServerTPM.chaosmap())
                 # ClientW = np.array(text_data_json['W'])
                 # ttt = True
@@ -172,10 +240,11 @@ class TpmConsumer(WebsocketConsumer):
                 #         if self.ServerTPM.W[i][j] != ClientW[i][j]:
                 #             ttt = False
                 if self.ServerTPM.chaosmap()==text_data_json['chaosmap']:
+                    print('resultServer chaosmap = resultClient chaosmap')
                     print(self.ServerTPM.chaosmap()==text_data_json['chaosmap'])
-                    print('server-', self.ServerTPM.W)
-                    print('client-',np.array(text_data_json['W']))
-                    print("FinishSync:{}".format(self.ServerTPM.W))
+                    #print('server-', self.ServerTPM.W)
+                    #print('client-',np.array(text_data_json['W']))
+                    #print("FinishSync:{}".format(self.ServerTPM.W))
                     result = ''
                     for i in range(len(self.ServerTPM.W)):
                         for j in range(len(self.ServerTPM.W[i])):
@@ -201,36 +270,38 @@ class TpmConsumer(WebsocketConsumer):
                     #     'message': 'Resync tpms',
                     # }))
                 else:
-                    # print(self.sid)
+                    print('resultServer chaosmap != resultClient chaosmap')
+                    # print(self.seed)
                     # print(self.ServerTPM.X)
                     # print('server-', self.ServerTPM.W)
                     # print('client-',np.array(text_data_json['W']))
                     # print('result1-',self.ServerTPM.tau)
                     # print('result2-',int(text_data_json['resultClient']))
                     self.ServerTPM.update(int(text_data_json['resultClient']), 'hebbian')
-                    #print(self.sid)
-                    #print(self.ServerTPM.W)
+                    # print(self.seed)
+                    # print(self.ServerTPM.W)
                     # vector = []
                     # for i in range(len(self.X)):
                     #     vector.append([])
                     #     for j in range(len(self.X[i])):
                     #         vector[i].append(X[i][j])
                     self.send(text_data=json.dumps({
-                        'type': 'GetSidAndResultTrue',
-                        'sid': int(self.sid),
+                        'type': 'GetSeedAndResultTrue',
+                        'seed': int(self.seed),
                         'vector': self.ServerTPM.X.tolist(),
                         "Result": int(self.resultServer),
                         "W": self.ServerTPM.W.tolist(),
                     }))
             else:
+                print('resultServer = resultClient')
                 # vector = []
                 # for i in range(len(self.X)):
                 #     vector.append([])
                 #     for j in range(len(self.X[i])):
                 #         vector[i].append(X[i][j])
                 self.send(text_data=json.dumps({
-                    'type': 'GetSidAndResultFalse',
-                    'sid': int(self.sid),
+                    'type': 'GetSeedAndResultFalse',
+                    'seed': int(self.seed),
                     'vector': self.ServerTPM.X.tolist(),
                     "Result": int(self.resultServer),
                 }))                    

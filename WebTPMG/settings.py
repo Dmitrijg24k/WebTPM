@@ -47,6 +47,7 @@ INSTALLED_APPS = [
 
     'tpm',
     'chat',
+    'todos.apps.TodosConfig',
 ]
 
 ASGI_APPLICATION = 'WebTPMG.asgi.application'

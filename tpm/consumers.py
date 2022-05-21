@@ -295,7 +295,7 @@ class TpmConsumer(WebsocketConsumer):
                         "W": self.ServerTPM.W.tolist(),
                     }))
             else:
-                print('resultServer = resultClient')
+                print('resultServer != resultClient')
                 # vector = []
                 # for i in range(len(self.X)):
                 #     vector.append([])

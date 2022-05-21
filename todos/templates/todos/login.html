@@ -6,6 +6,9 @@
 </div>
 
 <div class="card-body">
+    {% if form.errors %}
+        <p>{{ form.errors.error }}</p>
+    {% endif %}
     <form method="POST">
         {% csrf_token %}
         {{form.as_p}}

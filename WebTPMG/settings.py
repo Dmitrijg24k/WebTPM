@@ -27,9 +27,11 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-AUTH_USER_MODEL = 'tpm.User'
+AUTH_USER_MODEL = 'todos.User'
 
-LOGIN_REDIRECT_URL = '/load/'
+LOGIN_URL = '/login/'
+
+LOGIN_REDIRECT_URL = '/'
 
 LOGOUT_REDIRECT_URL = '/'
 

@@ -7,7 +7,7 @@ import math
 import random
 from random import randrange
 import time
-from .models import Sessions
+from todos.models import Sessions
 
 
 class mersenne_rng(object):
@@ -185,9 +185,6 @@ class TpmConsumer(WebsocketConsumer):
         # time.sleep(0.4)
         if text_data_json['type'] == 'ClientReadySync':
             # print(text_data_json)
-            currentSession = self.scope["user"].sessionId
-            if (currentSession):
-                currentSession.delete()
             # message = text_data_json['message']
             # self.ServerTPM = TPMClient(text_data_json['k'],text_data_json['n'], text_data_json['l'])
             self.send(text_data=json.dumps({
@@ -254,6 +251,9 @@ class TpmConsumer(WebsocketConsumer):
                     session = Sessions(
                         sessionKey = result
                     )
+                    currentSession = self.scope["user"].sessionId
+                    if (currentSession):
+                        currentSession.delete()
                     print(1111, session.id)
                     session.save()
                     self.scope["user"].sessionId = session

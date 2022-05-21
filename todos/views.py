@@ -6,7 +6,6 @@ from django.urls import reverse_lazy
 
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
 
 # Imports for Reordering Feature
@@ -15,7 +14,48 @@ from django.shortcuts import redirect
 from django.db import transaction
 
 from .models import Task
-from .forms import PositionForm
+from .forms import PositionForm, UserCreationForm
+from django.contrib.auth import authenticate, login
+
+class CustomLoginView(LoginView):
+    template_name = 'todos/login.html'
+    fields = '__all__'
+    redirect_authenticated_user = True
+
+    def get_success_url(self):
+        return reverse_lazy('tasks')
+
+
+class RegisterPage(FormView):
+    template_name = 'todos/register.html'
+    form_class = UserCreationForm
+    redirect_authenticated_user = True
+    success_url = reverse_lazy('tasks')
+
+    def form_valid(self, form):
+        user = form.save()
+        if user is not None:
+            login(self.request, user)
+        return super(RegisterPage, self).form_valid(form)
+
+    def get(self, *args, **kwargs):
+        if self.request.user.is_authenticated:
+            return redirect('tasks')
+        return super(RegisterPage, self).get(*args, **kwargs)
+    # def post(self, request):
+    #     form = UserCreationForm(request.POST)
+
+    #     if form.is_valid():
+    #         form.save()
+    #         username = form.cleaned_data.get('username')
+    #         password = form.cleaned_data.get('password1')
+    #         user = authenticate(username=username, password=password)
+    #         login(request, user)
+    #         return redirect('home')
+    #     context = {
+    #         'form': form
+    #     }
+    #     return render(request, self.template_name, context)
 
 
 class TaskList(LoginRequiredMixin, ListView):
@@ -40,7 +80,7 @@ class TaskList(LoginRequiredMixin, ListView):
 class TaskDetail(LoginRequiredMixin, DetailView):
     model = Task
     context_object_name = 'task'
-    template_name = 'base/task.html'
+    template_name = 'todos/task.html'
 
 
 class TaskCreate(LoginRequiredMixin, CreateView):

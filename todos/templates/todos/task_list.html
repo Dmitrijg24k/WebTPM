@@ -606,19 +606,32 @@
     
 
     const delay = ms => new Promise(res => setTimeout(res, ms));
-
+    let static = {times:[]}
     let k = 8
     let n = 8
     let l = 100
 
-    function start(websocketServerLocationz){
+    function start(websocketServerLocation, k, n, l){
+        if (l > 200){
+            n += 1;
+            if (n > 25){
+                k+=1;
+                if (k > 25){
+                    console.log(static)
+                    console.log(test123)
+                }
+                n = 4
+            } 
+            l = 10;
+        }
+        let iter = 1
         let el = document.getElementById("circularG");
         console.log(el)
         el.className = "active";
         tpmSocket = new WebSocket(websocketServerLocation);
         console.log('start sync')
         let ClientTPM = new Machine()
-
+        const startTime = new Date().getTime();
         tpmSocket.onopen = (()=>{
             console.log("Connected to server")
             //ClientTPM = new Machine()
@@ -683,6 +696,7 @@
             }
             if(data.type === 'GetSeedAndResultTrue'){
                 console.log("GetSeedAndResultTrue")
+                iter+=1
                 //console.log(ClientTPM)
                 let X = gen_rand_vector(data['seed'], l, k, n)// data['vector']//(data["seed"], l, k, n);
                 //console.log(ClientTPM.W)
@@ -701,6 +715,7 @@
             }
             if(data.type === 'GetSeedAndResultFalse'){
                 console.log("GetSeedAndResultFalse")
+                iter+=1
                 //console.log(`output_received msg:${data.message}`)
                 let X = gen_rand_vector(data['seed'], l, k, n)//data['vector']//gen_rand_vector(data["seed"], l, k, n);
                 let resultClient =  ClientTPM.get_output(X);
@@ -717,6 +732,10 @@
                 console.log(ClientTPM.W)
                 console.log(ClientTPM.chaosmap())
                 el.className = "notActive"
+                const end = new Date().getTime();
+                console.log(`k=${k},n=${n},l=${l}`)
+                l += 10;
+                static['times'].push({k:k, n:n, l:l, time: end-startTime, iter:iter})
                 tpmSocket.close();
             }
         }
@@ -724,14 +743,15 @@
         // ws.onmessage = function(evt) { alert('message received'); };
         tpmSocket.onclose = function(){
             // Try to reconnect in 5 seconds
-            setTimeout(function(){start(websocketServerLocation)}, 35000);
+            setTimeout(function(){start(websocketServerLocation, k, n, l)}, 1000);  //35000
         };
     }
 
-    start(url)
+    start(url, 4, 4, 10)
 
 
     console.log('end')
 
 </script>
 {% endblock content %}
+

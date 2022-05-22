@@ -611,7 +611,10 @@
     let n = 8
     let l = 100
 
-    function start(websocketServerLocation){
+    function start(websocketServerLocationz){
+        let el = document.getElementById("circularG");
+        console.log(el)
+        el.className = "active";
         tpmSocket = new WebSocket(websocketServerLocation);
         console.log('start sync')
         let ClientTPM = new Machine()
@@ -713,6 +716,7 @@
                 console.log('FinishSync')
                 console.log(ClientTPM.W)
                 console.log(ClientTPM.chaosmap())
+                el.className = "notActive"
                 tpmSocket.close();
             }
         }

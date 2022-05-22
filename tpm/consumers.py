@@ -165,7 +165,7 @@ class TpmConsumer(WebsocketConsumer):
     # let ServerTPM = 
     def connect(self):
         self.accept()
-        print(dir(self.scope["user"]))
+        # print(dir(self.scope["user"]))
         # self.send(text_data=json.dumps({
         #     'type': 'ServerReadySync',
         #     'message': 'Client connected'
@@ -214,7 +214,7 @@ class TpmConsumer(WebsocketConsumer):
                 'vector': self.ServerTPM.X.tolist()
             }))
         if text_data_json['type'] == 'GetResultClient':
-            #print('GetResultClient')
+            print('GetResultClient')
             #print(self.ServerTPM.k, self.ServerTPM.n, self.ServerTPM.l)
             #print("seed:{}".format(self.seed))
             # self.X = gen_rand_vector(self.seed, self.l, self.k, self.n)

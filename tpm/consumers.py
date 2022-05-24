@@ -252,12 +252,12 @@ class TpmConsumer(WebsocketConsumer):
                         sessionKey = result
                     )
                     currentSession = self.scope["user"].sessionId
-                    if (currentSession):
-                        currentSession.delete()
                     print(1111, session.id)
                     session.save()
                     self.scope["user"].sessionId = session
-                    self.scope["user"].save()
+                    self.scope["user"].save(update_fields=['sessionId'])
+                    if (currentSession):
+                        currentSession.delete()
                     self.send(text_data=json.dumps({
                         'type': 'FinishSync',
                         'message': 'FinishSync hehe',

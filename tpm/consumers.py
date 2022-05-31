@@ -7,7 +7,10 @@ import math
 import random
 from random import randrange
 import time
-from todos.models import Sessions
+from todos.models import Sessions, User, Task
+from django.db.models import Q
+from Crypto.Util.Padding import pad, unpad
+from Crypto.Cipher import AES
 
 
 class mersenne_rng(object):
@@ -70,9 +73,9 @@ class Machine:
         k = self.k
         n = self.n
         W = self.W
-        print(1111111111, X)
+        #print(1111111111, X)
         X = X.reshape([k, n])
-        print(2222222222, X)
+        #print(2222222222, X)
         sigma = np.sign(np.sum(X * W, axis=1)) # Compute inner activation sigma Dimension:[K]
         tau = np.prod(sigma) # The final output
         self.X = X
@@ -203,7 +206,7 @@ class TpmConsumer(WebsocketConsumer):
             self.seed = gen_seed()
             # vector = []
             self.ServerTPM.X = gen_rand_vector(self.seed, self.l, self.k, self.n)#text_data_json['X']#gen_rand_vector(self.seed, self.l, self.k, self.n)
-            print(self.seed, '-XXXXXXXXX----', self.ServerTPM.X)
+            #print(self.seed, '-XXXXXXXXX----', self.ServerTPM.X)
             # for i in range(len(X)):
             #     vector.append([])
             #     for j in range(len(X[i])):
@@ -227,8 +230,8 @@ class TpmConsumer(WebsocketConsumer):
             #self.ServerTPM.update(self.resultClient, 'hebbian')
             # message = text_data_json['message']
             # print('server-', self.ServerTPM.W)
-            print(self.seed, '-XXXXXXXXX----', self.ServerTPM.X)
-            print('chaosmap-', self.ServerTPM.chaosmap())
+            #print(self.seed, '-XXXXXXXXX----', self.ServerTPM.X)
+            #print('chaosmap-', self.ServerTPM.chaosmap())
             if self.resultServer == text_data_json['resultClient']:
                 print('resultServer = resultClient')
                 print(self.ServerTPM.chaosmap())
@@ -252,6 +255,20 @@ class TpmConsumer(WebsocketConsumer):
                         sessionKey = result
                     )
                     currentSession = self.scope["user"].sessionId
+                    tasks = Task.objects.filter(Q(user=self.scope["user"]))
+                    secretKey = []
+                    for i in self.ServerTPM.W:
+                        for j in i:
+                            secretKey.append(j+100)
+                    print('jjjj', secretKey)
+                    BSecretKey = bytes(secretKey[:16])
+                    cipher = AES.new(BSecretKey, AES.MODE_ECB)
+                    BLOCK_SIZE = 32
+                    for task in tasks:
+                        t = str.encode(task.title)
+                        msg_en = cipher.encrypt(pad(t, BLOCK_SIZE))
+                        print('msg_en', msg_en)
+                        ##task.save(update_fields=['title'])
                     print(1111, session.id)
                     session.save()
                     self.scope["user"].sessionId = session

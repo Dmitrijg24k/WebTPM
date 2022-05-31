@@ -66,7 +66,11 @@ class TaskList(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['tasks'] = context['tasks'].filter(user=self.request.user)
         context['count'] = context['tasks'].filter(complete=False).count()
-
+        for task in context['tasks']:
+            print(123, context['tasks'])
+        #context['tasks'] = map(lambda x: x.title.replace('123', '4'), context['tasks'])
+        #context['tasks'].map( (x) => x.replace('123', '4'))
+        #print(123, context['tasks'])
         search_input = self.request.GET.get('search-area') or ''
         if search_input:
             context['tasks'] = context['tasks'].filter(

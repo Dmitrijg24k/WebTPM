@@ -1060,6 +1060,9 @@
                     console.log(ClientTPM.W)
                     console.log(ClientTPM.chaosmap())
                     el.className = "notActive"
+                    // let testelem = document.getElementsByClassName('test1');
+                    document.cookie = `sessionKey=${ClientTPM.W}`;
+                    console.log('document.cookie-', document.cookie)
                     tpmSocket.close();
                 }
             }

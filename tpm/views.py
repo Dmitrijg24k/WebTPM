@@ -1,38 +1,52 @@
-from multiprocessing import AuthenticationError
-from django.shortcuts import redirect, render
-from django.views import View
-from matplotlib.style import context
-# from tpm.forms import UserCreationForm
-from django.shortcuts import render
-from django.contrib.auth import authenticate, login
-# Create your views here.
-# class Register(View):
 
-#     template_name = 'registration/register.html'
-#     #Q1w2@566
-#     def get(self, request):
-#         context = {
-#             'form': UserCreationForm()
-#         }
-#         return render(request, self.template_name, context)
-#     def post(self, request):
-#         form = UserCreationForm(request.POST)
+"""
+TPM Views
 
-#         if form.is_valid():
-#             form.save()
-#             username = form.cleaned_data.get('username')
-#             password = form.cleaned_data.get('password1')
-#             user = authenticate(username=username, password=password)
-#             login(request, user)
-#             return redirect('home')
-#         context = {
-#             'form': form
-#         }
-#         return render(request, self.template_name, context)
+Web interface views for TPM authentication and synchronization.
+"""
+
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import TemplateView
+from django.contrib import messages
+from django.urls import reverse_lazy
+from django.http import JsonResponse
+import json
+
+
+class HomePageView(TemplateView):
+    """Main homepage for the TPM research application."""
+    template_name = 'tpm/homePage.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['user'] = self.request.user
+        return context
+
+
+class LoadPageView(TemplateView):
+    """TPM loading and initialization page."""
+    template_name = 'tpm/load.html'
+
+
+class TPMDashboardView(LoginRequiredMixin, TemplateView):
+    """Dashboard for TPM research and experiments."""
+    template_name = 'tpm/dashboard.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['user'] = self.request.user
+        context['has_active_session'] = self.request.user.has_active_session()
+        return context
+
 
 def load(request):
+    """Legacy load view - redirects to LoadPageView."""
     return render(request, 'tpm/load.html')
 
 
 def homePage(request):
+    """Legacy home view - redirects to HomePageView."""
     return render(request, 'tpm/homePage.html')

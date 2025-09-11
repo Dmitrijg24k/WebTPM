@@ -1,11 +1,15 @@
 from django.urls import path, include
-# from django.views.generic import TemplateView
+from django.contrib.auth.views import LoginView, LogoutView
 from . import views
-# from tpm.views import Register
 
 urlpatterns = [
-    path('load/', views.load),
-    path('', views.homePage, name='home'),
+    # Main pages
+    path('', views.HomePageView.as_view(), name='home'),
+    path('load/', views.LoadPageView.as_view(), name='load'),
+    path('dashboard/', views.TPMDashboardView.as_view(), name='dashboard'),
+    
+    # Authentication
+    path('login/', LoginView.as_view(template_name='tpm/login.html'), name='login'),
+    path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
     path('', include('django.contrib.auth.urls')),
-    # path('register/', Register.as_view(), name='register')
 ]

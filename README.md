@@ -149,4 +149,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Authors
 
-- **Dmitrijg24k** - *Lead Researcher & Developer* - [LinkedIn](https://linkedin.com/in/dmitrijg24k) | [GitHub](https://github.com/Dmitrijg24k)
+- **Dmitrijg24k** - *Lead Researcher & Developer* - [GitHub](https://github.com/Dmitrijg24k)
